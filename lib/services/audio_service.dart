@@ -36,8 +36,8 @@ class AudioService {
   final Map<String, String> _fileNames = {};
   final Set<String> _preloaded = {};
   double _volume = 1.0;
-  final bool _disposed = false;
   bool _initStarted = false;
+  Future<void>? _initFuture;
 
   double get volume => _volume;
 
@@ -51,16 +51,18 @@ class AudioService {
       } catch (_) {}
     }
     if (_volume == 0) {
-      for (final p in _players.values) {
-        p.stop();
-      }
+      stopAll();
     }
   }
 
   Future<void> init() async {
-    if (_disposed || _initStarted) return;
+    if (_initStarted) return _initFuture!;
     _initStarted = true;
+    _initFuture = _runInit();
+    return _initFuture!;
+  }
 
+  Future<void> _runInit() async {
     await _createPlayers();
     await _resolveFileNames();
     debugPrint(
@@ -118,7 +120,12 @@ class AudioService {
   }
 
   Future<void> _play(String key) async {
-    if (_volume <= 0 || _disposed) return;
+    if (_volume <= 0) return;
+    // 첫 탭이 init 완료 전에 들어오면 manifest/preload 끝날 때까지 대기 →
+    // _candidateExtensions 4회 fallback try 루프 회피.
+    if (_initFuture != null) {
+      await _initFuture;
+    }
     final player = _players[key];
     if (player == null) return;
 
@@ -166,7 +173,6 @@ class AudioService {
   }
 
   void stopAll() {
-    if (_disposed) return;
     for (final p in _players.values) {
       p.stop();
     }

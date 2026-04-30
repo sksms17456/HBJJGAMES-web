@@ -1,23 +1,42 @@
 import 'package:flutter/foundation.dart';
-import 'package:web/web.dart' as web;
 
 import '../services/audio_service.dart';
 
+/// 키-값 저장소 인터페이스. 프로덕션에서는 main.dart 가 `WebLocalStorage` 를
+/// 주입하고, 테스트는 [InMemoryKeyValueStore] 를 사용한다.
+/// (이 파일은 `package:web` 에 의존하지 않아 VM `flutter test` 환경에서도 안전.)
+abstract class KeyValueStore {
+  String? read(String key);
+  void write(String key, String value);
+}
+
+@visibleForTesting
+class InMemoryKeyValueStore implements KeyValueStore {
+  final Map<String, String> _data = {};
+
+  @override
+  String? read(String key) => _data[key];
+
+  @override
+  void write(String key, String value) {
+    _data[key] = value;
+  }
+}
+
 /// 사운드 볼륨 (0.0~1.0) 영속 저장소.
-///
-/// `AudioService.volume` 와 양방향 동기화. 외부에서는 [hydrate] / [setVolume]
-/// 두 메서드만 사용한다. 0 이면 mute (UI 에서 mute 아이콘 표시).
 class SoundPrefs extends ChangeNotifier {
-  SoundPrefs._();
-  static final SoundPrefs instance = SoundPrefs._();
+  SoundPrefs({KeyValueStore? store})
+    : _store = store ?? InMemoryKeyValueStore();
+
+  /// 프로덕션 싱글턴. main.dart 가 `WebLocalStorage` 주입한 인스턴스로 교체.
+  static SoundPrefs instance = SoundPrefs();
 
   static const _volumeKey = 'hbjj_sound_volume';
   static const _lastKey = 'hbjj_sound_last_nonzero';
 
-  double _volume = 1.0;
+  final KeyValueStore _store;
 
-  /// mute 상태에서 unmute 시 복원할 마지막 양수 볼륨.
-  /// 페이지 새로고침 후에도 유지되도록 별도 키로 영속.
+  double _volume = 1.0;
   double _lastNonZero = 1.0;
 
   double get volume => _volume;
@@ -25,8 +44,7 @@ class SoundPrefs extends ChangeNotifier {
 
   void hydrate() {
     _volume = _read(_volumeKey) ?? 1.0;
-    _lastNonZero =
-        _read(_lastKey) ?? (_volume > 0 ? _volume : 1.0);
+    _lastNonZero = _read(_lastKey) ?? (_volume > 0 ? _volume : 1.0);
     AudioService.instance.setVolume(_volume);
   }
 
@@ -41,11 +59,8 @@ class SoundPrefs extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// 스피커 아이콘 탭 — 0 ↔ 마지막 양수 볼륨 토글.
   Future<void> toggleMute() async {
     if (_volume > 0) {
-      // 현재 양수 → mute. _lastNonZero 는 setVolume 호출 직전에 보존되므로
-      // 여기서 별도 저장 안 해도 OK.
       await setVolume(0);
     } else {
       await setVolume(_lastNonZero == 0 ? 1.0 : _lastNonZero);
@@ -53,21 +68,12 @@ class SoundPrefs extends ChangeNotifier {
   }
 
   double? _read(String key) {
-    try {
-      final v = web.window.localStorage.getItem(key);
-      if (v == null) return null;
-      return double.tryParse(v);
-    } catch (e) {
-      debugPrint('SoundPrefs read failed: $e');
-      return null;
-    }
+    final v = _store.read(key);
+    if (v == null) return null;
+    return double.tryParse(v);
   }
 
   void _write(String key, double v) {
-    try {
-      web.window.localStorage.setItem(key, v.toStringAsFixed(2));
-    } catch (e) {
-      debugPrint('SoundPrefs write failed: $e');
-    }
+    _store.write(key, v.toStringAsFixed(2));
   }
 }

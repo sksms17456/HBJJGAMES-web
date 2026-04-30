@@ -25,6 +25,13 @@ enum InfiniteGamePhase {
 /// Correct taps recover time; wrong taps subtract time.
 /// Numbers go from 1–999 per loop, then the loop increments.
 class InfiniteModeController extends ChangeNotifier {
+  InfiniteModeController({
+    Duration tickInterval = const Duration(milliseconds: 16),
+  }) : _tickInterval = tickInterval;
+
+  /// 내부 타이머의 tick 간격. 테스트에서 더 짧은 간격을 주입 가능.
+  final Duration _tickInterval;
+
   int _currentTarget = 1;
   int get currentTarget => _currentTarget;
 
@@ -169,7 +176,7 @@ class InfiniteModeController extends ChangeNotifier {
   void _startTimer() {
     _stopwatch.start();
     _lastStopwatchUs = _stopwatch.elapsedMicroseconds;
-    _timer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+    _timer = Timer.periodic(_tickInterval, (_) {
       _syncRemainingTime();
       if (_remainingTime <= 0) {
         _onTimeExpired();

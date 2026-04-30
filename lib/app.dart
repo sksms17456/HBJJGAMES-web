@@ -92,10 +92,13 @@ final GoRouter appRouter = GoRouter(
 );
 
 /// dialog pop transition (default ~200ms) 이 끝난 후 navigate.
-/// 이전엔 addPostFrameCallback 만으론 transition 진행 중이라 GoRouter
-/// delegate 와 Navigator state 가 동시에 변경되며 assertion (흰 화면) 발생.
+/// 같은 path 로 빠르게 두 번 트리거되면 timer 가 줄지어 발화 → 흰화면/이중
+/// push 가 나므로 현재 path 와 동일하면 skip.
 void _scheduleGo(String path) {
   Future.delayed(const Duration(milliseconds: 250), () {
+    final current =
+        appRouter.routerDelegate.currentConfiguration.uri.toString();
+    if (current == path) return;
     appRouter.go(path);
   });
 }

@@ -421,10 +421,13 @@ class _GameScreenState extends State<GameScreen> with WidgetsBindingObserver {
 
     _pauseDialogOpen = true;
     final choice = await showGamePauseDialog(context);
+    if (!mounted) {
+      _pauseDialogOpen = false;
+      return;
+    }
     // Dialog pop transition (~200ms) 이 끝나기 전에 setState / navigation 을
     // 호출하면 GoRouter delegate + Navigator state 가 충돌해 흰 화면이 뜬다.
     await Future.delayed(const Duration(milliseconds: 250));
-
     if (!mounted) {
       _pauseDialogOpen = false;
       return;

@@ -24,6 +24,13 @@ enum BasicGamePhase {
 /// Tracks elapsed time (with penalty), the current target number,
 /// and game phase transitions.
 class BasicModeController extends ChangeNotifier {
+  BasicModeController({
+    Duration tickInterval = const Duration(milliseconds: 16),
+  }) : _tickInterval = tickInterval;
+
+  /// 내부 타이머의 tick 간격. 테스트에서는 짧게 주입해 game-tick 시뮬을 빠르게.
+  final Duration _tickInterval;
+
   /// The next number the player must tap.
   int _currentTarget = 1;
   int get currentTarget => _currentTarget;
@@ -151,7 +158,7 @@ class BasicModeController extends ChangeNotifier {
     _lastStopwatchUs = _stopwatch.elapsedMicroseconds;
     // 16ms (~60Hz) matches vsync — faster ticks would bounce against the
     // display refresh and waste notifyListeners on frames that can't render.
-    _timer = Timer.periodic(const Duration(milliseconds: 16), (_) {
+    _timer = Timer.periodic(_tickInterval, (_) {
       _syncElapsedTime();
       notifyListeners();
     });
